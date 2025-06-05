@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// --- Speech Recognition Type Definitions ---
-// These minimal interfaces help avoid using "any" for the Web Speech API.
-
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
@@ -44,18 +41,19 @@ interface SpeechRecognitionErrorEvent extends Event {
   message: string;
 }
 
-// Extend the Window interface to include the available SpeechRecognition constructors.
-declare global {
-  interface Window {
-    SpeechRecognition: { new (): SpeechRecognition } | undefined;
-    webkitSpeechRecognition: { new (): SpeechRecognition } | undefined;
-  }
-}
+export type LanguageCode =
+  | "en"
+  | "es"
+  | "fr"
+  | "de"
+  | "it"
+  | "pt"
+  | "ru"
+  | "zh"
+  | "ja"
+  | "ar"
+  | "bn";
 
-// --- End Speech Recognition Types ---
-
-// Define the language code type and mapping. Placing these outside the component ensures stability.
-export type LanguageCode = "en" | "es" | "fr" | "de" | "it" | "pt" | "ru" | "zh" | "ja" | "ar" | "bn";
 export const langMap: Record<LanguageCode, string> = {
   en: "en-US",
   es: "es-ES",
@@ -81,10 +79,11 @@ export default function TranslatorApp() {
   const outputRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Initialize Speech Recognition when the input language changes.
+  // Initialize speech recognition when input language changes
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Support for both standard and prefixed SpeechRecognition
+      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionConstructor) {
         const recognition = new SpeechRecognitionConstructor();
         recognition.continuous = false;
@@ -113,7 +112,7 @@ export default function TranslatorApp() {
     }
   }, [inputLang]);
 
-  // Handler to start voice recognition.
+  // Start listening for voice input
   const startListening = () => {
     if (recognitionRef.current) {
       setIsListening(true);
@@ -122,7 +121,7 @@ export default function TranslatorApp() {
     }
   };
 
-  // Using useCallback to wrap translateText helps control its dependencies.
+  // Function to translate the text
   const translateText = useCallback(async () => {
     if (!inputText.trim()) {
       setTranslatedText("");
@@ -151,7 +150,7 @@ export default function TranslatorApp() {
     setLoading(false);
   }, [inputText, inputLang, targetLang]);
 
-  // Debounce translation: wait 500ms after input changes before triggering translation.
+  // Debounce the translation when input changes
   useEffect(() => {
     const timer = setTimeout(() => {
       translateText();
@@ -159,7 +158,7 @@ export default function TranslatorApp() {
     return () => clearTimeout(timer);
   }, [translateText]);
 
-  // Auto-scroll the output container when translated text updates.
+  // Auto-scroll the output section when new translation appears
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
@@ -170,14 +169,11 @@ export default function TranslatorApp() {
     <div className="app-container">
       <div className="glow-effect"></div>
       <div className="glow-effect-2"></div>
-
       <div className="translator-card">
         <h1 className="translator-title">TRANSLATOR APP</h1>
-
         <div className="instruction-text">
-          TYPE TEXT, OR CLICK THE <span className="highlight">"SPEAK"</span> BUTTON TO USE YOUR VOICE.
+          TYPE TEXT, OR CLICK THE <span className="highlight">&quot;SPEAK&quot;</span> BUTTON TO USE YOUR VOICE.
         </div>
-
         <div className="input-section">
           <div className="input-group">
             <input
@@ -200,15 +196,14 @@ export default function TranslatorApp() {
               )}
             </button>
           </div>
-
           {errorMessage && <div className="error-message">{errorMessage}</div>}
-
           <div className="language-selectors">
             <div className="language-selector">
               <label className="language-label">Input Language:</label>
               <select
                 className="language-select"
                 value={inputLang}
+                style={{ color: "black" }}
                 onChange={(e) => setInputLang(e.target.value as LanguageCode)}
               >
                 <option value="en">English</option>
@@ -224,12 +219,12 @@ export default function TranslatorApp() {
                 <option value="bn">Bengali</option>
               </select>
             </div>
-
             <div className="language-selector">
               <label className="language-label">Translation Language:</label>
               <select
                 className="language-select"
                 value={targetLang}
+                style={{ color: "black" }}
                 onChange={(e) => setTargetLang(e.target.value as LanguageCode)}
               >
                 <option value="en">English</option>
@@ -247,7 +242,6 @@ export default function TranslatorApp() {
             </div>
           </div>
         </div>
-
         <div className="output-section">
           <div className="output-title">Translation:</div>
           <div ref={outputRef} className={`output-content ${loading ? "loading" : ""}`}>
