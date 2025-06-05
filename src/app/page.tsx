@@ -1,56 +1,102 @@
-// page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
+// --- Speech Recognition Type Definitions ---
+// These minimal interfaces help avoid using "any" for the Web Speech API.
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((this: SpeechRecognition, event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((this: SpeechRecognition, event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: ((this: SpeechRecognition, event: Event) => void) | null;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+// Extend the Window interface to include the available SpeechRecognition constructors.
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    SpeechRecognition: { new (): SpeechRecognition } | undefined;
+    webkitSpeechRecognition: { new (): SpeechRecognition } | undefined;
   }
 }
 
-export default function TranslatorApp() {
-  type LanguageCode = "en" | "es" | "fr" | "de" | "it" | "pt" | "ru" | "zh" | "ja" | "ar" | "bn";
-  const langMap: Record<LanguageCode, string> = {
-    en: "en-US",
-    es: "es-ES",
-    fr: "fr-FR",
-    de: "de-DE",
-    it: "it-IT",
-    pt: "pt-PT",
-    ru: "ru-RU",
-    zh: "zh-CN",
-    ja: "ja-JP",
-    ar: "ar-SA",
-    bn: "bn-IN",
-  };
+// --- End Speech Recognition Types ---
 
-  const [inputText, setInputText] = useState("");
-  const [translatedText, setTranslatedText] = useState("");
+// Define the language code type and mapping. Placing these outside the component ensures stability.
+export type LanguageCode = "en" | "es" | "fr" | "de" | "it" | "pt" | "ru" | "zh" | "ja" | "ar" | "bn";
+export const langMap: Record<LanguageCode, string> = {
+  en: "en-US",
+  es: "es-ES",
+  fr: "fr-FR",
+  de: "de-DE",
+  it: "it-IT",
+  pt: "pt-PT",
+  ru: "ru-RU",
+  zh: "zh-CN",
+  ja: "ja-JP",
+  ar: "ar-SA",
+  bn: "bn-IN",
+};
+
+export default function TranslatorApp() {
+  const [inputText, setInputText] = useState<string>("");
+  const [translatedText, setTranslatedText] = useState<string>("");
   const [inputLang, setInputLang] = useState<LanguageCode>("en");
   const [targetLang, setTargetLang] = useState<LanguageCode>("es");
-  const [loading, setLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const outputRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
+  // Initialize Speech Recognition when the input language changes.
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
+      const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognitionConstructor) {
+        const recognition = new SpeechRecognitionConstructor();
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = langMap[inputLang] || inputLang;
         recognition.onresult = (event: SpeechRecognitionEvent) => {
-          const transcript = event.results[0][0].transcript;
+          const transcript = event.results[0].item(0).transcript;
           setInputText(transcript);
           setIsListening(false);
           setErrorMessage("");
         };
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
           console.error("Speech recognition error:", event.error);
           setIsListening(false);
           if (event.error === "network" && inputLang === "bn") {
@@ -67,6 +113,7 @@ export default function TranslatorApp() {
     }
   }, [inputLang]);
 
+  // Handler to start voice recognition.
   const startListening = () => {
     if (recognitionRef.current) {
       setIsListening(true);
@@ -75,7 +122,8 @@ export default function TranslatorApp() {
     }
   };
 
-  const translateText = async () => {
+  // Using useCallback to wrap translateText helps control its dependencies.
+  const translateText = useCallback(async () => {
     if (!inputText.trim()) {
       setTranslatedText("");
       return;
@@ -101,15 +149,17 @@ export default function TranslatorApp() {
       setTranslatedText("Translation failed. Please try again later.");
     }
     setLoading(false);
-  };
+  }, [inputText, inputLang, targetLang]);
 
+  // Debounce translation: wait 500ms after input changes before triggering translation.
   useEffect(() => {
     const timer = setTimeout(() => {
       translateText();
     }, 500);
     return () => clearTimeout(timer);
-  }, [inputText, inputLang, targetLang]);
+  }, [translateText]);
 
+  // Auto-scroll the output container when translated text updates.
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
@@ -120,14 +170,14 @@ export default function TranslatorApp() {
     <div className="app-container">
       <div className="glow-effect"></div>
       <div className="glow-effect-2"></div>
-      
+
       <div className="translator-card">
         <h1 className="translator-title">TRANSLATOR APP</h1>
-        
+
         <div className="instruction-text">
-          TYPE TEXT, OR CLICK THE <span className="highlight">'SPEAK'</span> BUTTON TO USE YOUR VOICE.
+          TYPE TEXT, OR CLICK THE <span className="highlight">"SPEAK"</span> BUTTON TO USE YOUR VOICE.
         </div>
-        
+
         <div className="input-section">
           <div className="input-group">
             <input
@@ -139,7 +189,7 @@ export default function TranslatorApp() {
             />
             <button
               onClick={startListening}
-              className={`speak-button ${isListening ? 'listening' : ''}`}
+              className={`speak-button ${isListening ? "listening" : ""}`}
             >
               {isListening ? (
                 <div className="pulse-animation">
@@ -150,9 +200,9 @@ export default function TranslatorApp() {
               )}
             </button>
           </div>
-          
+
           {errorMessage && <div className="error-message">{errorMessage}</div>}
-          
+
           <div className="language-selectors">
             <div className="language-selector">
               <label className="language-label">Input Language:</label>
@@ -174,7 +224,7 @@ export default function TranslatorApp() {
                 <option value="bn">Bengali</option>
               </select>
             </div>
-            
+
             <div className="language-selector">
               <label className="language-label">Translation Language:</label>
               <select
@@ -197,10 +247,10 @@ export default function TranslatorApp() {
             </div>
           </div>
         </div>
-        
+
         <div className="output-section">
           <div className="output-title">Translation:</div>
-          <div ref={outputRef} className={`output-content ${loading ? 'loading' : ''}`}>
+          <div ref={outputRef} className={`output-content ${loading ? "loading" : ""}`}>
             {loading ? (
               <div className="loading-spinner"></div>
             ) : (
