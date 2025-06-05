@@ -1,4 +1,3 @@
-// src/app/languages.ts
 export const languages = [
   { code: "en", name: "English" },
   { code: "es", name: "Spanish" },

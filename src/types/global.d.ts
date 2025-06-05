@@ -1,30 +1,31 @@
 // src/types/global.d.ts
 
 interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+  readonly resultIndex: number;
 }
 
 interface SpeechRecognitionResultList {
   [index: number]: SpeechRecognitionResult;
-  length: number;
+  readonly length: number;
   item(index: number): SpeechRecognitionResult;
 }
 
 interface SpeechRecognitionResult {
   [index: number]: SpeechRecognitionAlternative;
-  length: number;
+  readonly length: number;
   item(index: number): SpeechRecognitionAlternative;
+  readonly isFinal: boolean;
 }
 
 interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
+  readonly transcript: string;
+  readonly confidence: number;
 }
 
 interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
+  readonly error: string;
+  readonly message: string;
 }
 
 interface SpeechRecognition extends EventTarget {
@@ -39,13 +40,17 @@ interface SpeechRecognition extends EventTarget {
   onend: ((this: SpeechRecognition, ev: Event) => void) | null;
 }
 
-// Ambient declarations for the browser's SpeechRecognition API.
-declare var SpeechRecognition: {
+// Use declare const instead of var.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare const SpeechRecognition: {
   prototype: SpeechRecognition;
   new (): SpeechRecognition;
 };
 
-declare var webkitSpeechRecognition: {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare const webkitSpeechRecognition: {
   prototype: SpeechRecognition;
   new (): SpeechRecognition;
 };
+
+export {};

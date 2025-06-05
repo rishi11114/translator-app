@@ -1,119 +1,72 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((this: SpeechRecognition, event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((this: SpeechRecognition, event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: ((this: SpeechRecognition, event: Event) => void) | null;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-  message: string;
-}
-
-export type LanguageCode =
-  | "en"
-  | "es"
-  | "fr"
-  | "de"
-  | "it"
-  | "pt"
-  | "ru"
-  | "zh"
-  | "ja"
-  | "ar"
-  | "bn";
-
-export const langMap: Record<LanguageCode, string> = {
-  en: "en-US",
-  es: "es-ES",
-  fr: "fr-FR",
-  de: "de-DE",
-  it: "it-IT",
-  pt: "pt-PT",
-  ru: "ru-RU",
-  zh: "zh-CN",
-  ja: "ja-JP",
-  ar: "ar-SA",
-  bn: "bn-IN",
-};
+import { languages } from "./languages"; // your languages array file
 
 export default function TranslatorApp() {
   const [inputText, setInputText] = useState<string>("");
   const [translatedText, setTranslatedText] = useState<string>("");
-  const [inputLang, setInputLang] = useState<LanguageCode>("en");
-  const [targetLang, setTargetLang] = useState<LanguageCode>("es");
+  const [inputLang, setInputLang] = useState<string>("en");
+  const [targetLang, setTargetLang] = useState<string>("es");
   const [loading, setLoading] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const outputRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  // Initialize speech recognition when input language changes
   useEffect(() => {
     if (typeof window !== "undefined") {
-      // Support for both standard and prefixed SpeechRecognition
-      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognitionConstructor =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognitionConstructor) {
         const recognition = new SpeechRecognitionConstructor();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = langMap[inputLang] || inputLang;
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          const transcript = event.results[0].item(0).transcript;
+        // Set the recognition language (here we use the code directly)
+        recognition.lang = inputLang;
+
+        // Use a function declaration without an unused parameter:
+        recognition.onresult = function (event: SpeechRecognitionEvent): void {
+          // Access results by array notation since the built-in type implements iteration.
+          const transcript = event.results[0][0].transcript;
           setInputText(transcript);
           setIsListening(false);
           setErrorMessage("");
         };
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          console.error("Speech recognition error:", event.error);
+
+        // Update onerror as before:
+        recognition.onerror = function (
+          this: SpeechRecognition,
+          ev: SpeechRecognitionErrorEvent
+        ): void {
+          console.error("Speech recognition error:", ev.error);
           setIsListening(false);
-          if (event.error === "network" && inputLang === "bn") {
-            setErrorMessage("Speech recognition for Bengali is not available right now. Please type your text instead.");
+          if (ev.error === "network" && inputLang === "bn") {
+            setErrorMessage(
+              "Speech recognition for Bengali is not available right now. Please type your text instead."
+            );
           } else {
-            setErrorMessage(`Speech recognition error: ${event.error}. Please check your internet connection and try again.`);
+            setErrorMessage(
+              `Speech recognition error: ${ev.error}. Please check your internet connection and try again.`
+            );
           }
         };
-        recognition.onend = () => setIsListening(false);
+
+        // Remove the unused parameter (_ev) from this handler:
+        recognition.onend = function (this: SpeechRecognition): void {
+          setIsListening(false);
+        };
+
         recognitionRef.current = recognition;
       } else {
-        setErrorMessage("Speech recognition is not supported in your browser. Please use Google Chrome.");
+        setErrorMessage(
+          "Speech recognition is not supported in your browser. Please use Google Chrome."
+        );
       }
     }
   }, [inputLang]);
 
-  // Start listening for voice input
-  const startListening = () => {
+  const startListening = (): void => {
     if (recognitionRef.current) {
       setIsListening(true);
       setErrorMessage("");
@@ -121,8 +74,7 @@ export default function TranslatorApp() {
     }
   };
 
-  // Function to translate the text
-  const translateText = useCallback(async () => {
+  const translateText = useCallback(async (): Promise<void> => {
     if (!inputText.trim()) {
       setTranslatedText("");
       return;
@@ -132,11 +84,7 @@ export default function TranslatorApp() {
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: inputText,
-          input_lang: inputLang,
-          target_lang: targetLang,
-        }),
+        body: JSON.stringify({ text: inputText, input_lang: inputLang, target_lang: targetLang }),
       });
       if (!response.ok) {
         throw new Error(`Translation failed with status: ${response.status}`);
@@ -150,7 +98,6 @@ export default function TranslatorApp() {
     setLoading(false);
   }, [inputText, inputLang, targetLang]);
 
-  // Debounce the translation when input changes
   useEffect(() => {
     const timer = setTimeout(() => {
       translateText();
@@ -158,7 +105,6 @@ export default function TranslatorApp() {
     return () => clearTimeout(timer);
   }, [translateText]);
 
-  // Auto-scroll the output section when new translation appears
   useEffect(() => {
     if (outputRef.current) {
       outputRef.current.scrollTop = outputRef.current.scrollHeight;
@@ -183,10 +129,7 @@ export default function TranslatorApp() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
             />
-            <button
-              onClick={startListening}
-              className={`speak-button ${isListening ? "listening" : ""}`}
-            >
+            <button onClick={startListening} className={`speak-button ${isListening ? "listening" : ""}`}>
               {isListening ? (
                 <div className="pulse-animation">
                   <span className="mic-icon">🎤</span>
@@ -204,19 +147,13 @@ export default function TranslatorApp() {
                 className="language-select"
                 value={inputLang}
                 style={{ color: "black" }}
-                onChange={(e) => setInputLang(e.target.value as LanguageCode)}
+                onChange={(e) => setInputLang(e.target.value)}
               >
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="pt">Portuguese</option>
-                <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ar">Arabic</option>
-                <option value="bn">Bengali</option>
+                {languages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="language-selector">
@@ -225,19 +162,13 @@ export default function TranslatorApp() {
                 className="language-select"
                 value={targetLang}
                 style={{ color: "black" }}
-                onChange={(e) => setTargetLang(e.target.value as LanguageCode)}
+                onChange={(e) => setTargetLang(e.target.value)}
               >
-                <option value="en">English</option>
-                <option value="es">Spanish</option>
-                <option value="fr">French</option>
-                <option value="de">German</option>
-                <option value="it">Italian</option>
-                <option value="pt">Portuguese</option>
-                <option value="ru">Russian</option>
-                <option value="zh">Chinese</option>
-                <option value="ja">Japanese</option>
-                <option value="ar">Arabic</option>
-                <option value="bn">Bengali</option>
+                {languages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -245,11 +176,7 @@ export default function TranslatorApp() {
         <div className="output-section">
           <div className="output-title">Translation:</div>
           <div ref={outputRef} className={`output-content ${loading ? "loading" : ""}`}>
-            {loading ? (
-              <div className="loading-spinner"></div>
-            ) : (
-              translatedText || "Your translation will appear here..."
-            )}
+            {loading ? <div className="loading-spinner"></div> : translatedText || "Your translation will appear here..."}
           </div>
         </div>
       </div>
