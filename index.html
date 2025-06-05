@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Translator App</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="translator-app">
+    <h1>Translator App</h1>
+    <p>
+      Create an AI-powered app for real-time translation. Break language barriers and promote global communication.
+    </p>
+    <input
+      type="text"
+      id="inputText"
+      placeholder="Enter text to translate"
+    />
+    <button id="translateButton" onclick="translateText()">Translate</button>
+    <p id="translatedText"></p>
+  </div>
+
+  <script>
+    function translateText() {
+      const inputText = document.getElementById("inputText").value;
+      const apiKey = "dummy-api-key";
+      // Dummy API endpoint for demonstration
+      const url = `https://api.example.com/translate?text=${encodeURIComponent(inputText)}&key=${apiKey}`;
+
+      // Make a dummy fetch call to simulate translation
+      fetch(url)
+        .then((response) => response.json())
+        .then((data) => {
+          // Assuming the API returns a JSON with a property `translatedText`
+          document.getElementById("translatedText").innerText =
+            data.translatedText || "Translation not available (dummy API)";
+        })
+        .catch((error) => {
+          console.error("Error:", error);
+          document.getElementById("translatedText").innerText =
+            "Error translating text.";
+        });
+    }
+  </script>
+</body>
+</html>
